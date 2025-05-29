@@ -6,25 +6,29 @@ from torch import nn
 from torch.nn import init
 from torch.nn import functional as F
 
-
+# 将 Swish 函数作为人工神经网络的激活函数, 可以提高模型的性能.
+# 相较于 ReLU 和 sigmoid 函数, 人们认为, 性能提升的一个原因是Swish函数有助于在反向传播过程中缓解梯度消失问题
+# https://zhuanlan.zhihu.com/p/695082100
 class Swish(nn.Module):
     def forward(self, x):
         return x * torch.sigmoid(x)
 
 
 class TimeEmbedding(nn.Module):
+    # 1000, 128, 128 * 4
     def __init__(self, T, d_model, dim):
         assert d_model % 2 == 0
         super().__init__()
         emb = torch.arange(0, d_model, step=2) / d_model * math.log(10000)
-        emb = torch.exp(-emb)
-        pos = torch.arange(T).float()
-        emb = pos[:, None] * emb[None, :]
+        emb = torch.exp(-emb)              # [64]
+        pos = torch.arange(T).float()      # [1000]
+        emb = pos[:, None] * emb[None, :]  # [1000, 1] [1, 64] --> [1000, 64]
         assert list(emb.shape) == [T, d_model // 2]
-        emb = torch.stack([torch.sin(emb), torch.cos(emb)], dim=-1)
+        emb = torch.stack([torch.sin(emb), torch.cos(emb)], dim=-1)  # [1000, 64, 2]
         assert list(emb.shape) == [T, d_model // 2, 2]
-        emb = emb.view(T, d_model)
+        emb = emb.view(T, d_model)         # [1000, 128]
 
+        # torch.nn.Embedding 用法: https://zhuanlan.zhihu.com/p/607515931
         self.timembedding = nn.Sequential(
             nn.Embedding.from_pretrained(emb),
             nn.Linear(d_model, dim),
@@ -100,6 +104,7 @@ class AttnBlock(nn.Module):
         k = self.proj_k(h)
         v = self.proj_v(h)
 
+        # [B, C, H, W] --> [B, H, W, C]
         q = q.permute(0, 2, 3, 1).view(B, H * W, C)
         k = k.view(B, C, H * W)
         w = torch.bmm(q, k) * (int(C) ** (-0.5))
@@ -119,6 +124,7 @@ class ResBlock(nn.Module):
     def __init__(self, in_ch, out_ch, tdim, dropout, attn=False):
         super().__init__()
         self.block1 = nn.Sequential(
+            # BN，LN，IN，GN: https://zhuanlan.zhihu.com/p/35005794
             nn.GroupNorm(32, in_ch),
             Swish(),
             nn.Conv2d(in_ch, out_ch, 3, stride=1, padding=1),
@@ -161,6 +167,8 @@ class ResBlock(nn.Module):
 
 
 class UNet(nn.Module):
+    # "T", "channel", "channel_mult", "attn", "num_res_blocks", "dropout"
+    # 1000,      128,   [1, 2, 3, 4],    [2],                2,   0.15
     def __init__(self, T, ch, ch_mult, attn, num_res_blocks, dropout):
         super().__init__()
         assert all([i < len(ch_mult) for i in attn]), 'attn index out of bound'
@@ -168,6 +176,9 @@ class UNet(nn.Module):
         self.time_embedding = TimeEmbedding(T, ch, tdim)
 
         self.head = nn.Conv2d(3, ch, kernel_size=3, stride=1, padding=1)
+
+        # nn.ModuleList 并没有定义一个网络，它只是将不同的模块储存在一起，这些模块之间并没有什么先后顺序可言
+        # ModuleList 和 Sequential 区别: https://zhuanlan.zhihu.com/p/64990232
         self.downblocks = nn.ModuleList()
         chs = [ch]  # record output channel when dowmsample for upsample
         now_ch = ch
@@ -183,11 +194,13 @@ class UNet(nn.Module):
                 self.downblocks.append(DownSample(now_ch))
                 chs.append(now_ch)
 
+        ####################################################
         self.middleblocks = nn.ModuleList([
             ResBlock(now_ch, now_ch, tdim, dropout, attn=True),
             ResBlock(now_ch, now_ch, tdim, dropout, attn=False),
         ])
 
+        ####################################################
         self.upblocks = nn.ModuleList()
         for i, mult in reversed(list(enumerate(ch_mult))):
             out_ch = ch * mult
@@ -200,6 +213,7 @@ class UNet(nn.Module):
                 self.upblocks.append(UpSample(now_ch))
         assert len(chs) == 0
 
+        ####################################################
         self.tail = nn.Sequential(
             nn.GroupNorm(32, now_ch),
             Swish(),

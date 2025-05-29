@@ -17,6 +17,7 @@ def extract(v, t, x_shape):
 
 
 class GaussianDiffusionTrainer(nn.Module):
+    # 1e-4, 0.02, 1000
     def __init__(self, model, beta_1, beta_T, T):
         super().__init__()
 
@@ -98,6 +99,6 @@ class GaussianDiffusionSampler(nn.Module):
             x_t = mean + torch.sqrt(var) * noise
             assert torch.isnan(x_t).int().sum() == 0, "nan in tensor."
         x_0 = x_t
-        return torch.clip(x_0, -1, 1)   
+        return torch.clip(x_0, -1, 1)
 
 

@@ -36,10 +36,25 @@ def train(modelConfig: Dict):
             modelConfig["save_weight_dir"], modelConfig["training_load_weight"]), map_location=device))
     optimizer = torch.optim.AdamW(
         net_model.parameters(), lr=modelConfig["lr"], weight_decay=1e-4)
+
+    # torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max, eta_min=0, last_epoch=-1)
+    # optimizer‌: 要进行学习率调度的优化器对象  T_max‌: 一个周期的长度, 即学习率从最大值下降到最小值的周期长度. 通常设置为训练的总周期数.
+    # eta_min‌: 学习率的最小值, 默认为0        last_epoch‌: 上一个学习率更新的训练周期数, 默认为-1, 表示从第一个周期开始.
+
+    # CosineAnnealingLR的工作原理基于余弦函数
+    # 适用于需要周期性调整学习率的场景, 特别是在深度学习中, 这种策略可以帮助模型在训练初期以较大的学习率快速收敛, 而在训练后期以较小的学习率进行微调,
+    # 从而避免过拟合和提高模型的泛化能力. 此外, 它还可以帮助模型在训练过程中跳出局部最优, 找到更好的解.
+    # https://zhuanlan.zhihu.com/p/14402471296
     cosineScheduler = optim.lr_scheduler.CosineAnnealingLR(
         optimizer=optimizer, T_max=modelConfig["epoch"], eta_min=0, last_epoch=-1)
+    
+    # multiplier: 学习率倍增因子，默认情况下等于1表示从基础学习率逐渐增加
+    # 由于一开始参数不稳定, 梯度较大, 如果此时学习率设置过大可能导致数值不稳定.
+    # 使用 warm up 有助于减缓模型在初始阶段对mini-batch的提前过拟合现象, 保持分布的平稳, 其次也有助于保持模型深层的稳定性.
+    # warmUp 与 余弦退火结合的曲线图: https://zhuanlan.zhihu.com/p/674164759
     warmUpScheduler = GradualWarmupScheduler(
         optimizer=optimizer, multiplier=modelConfig["multiplier"], warm_epoch=modelConfig["epoch"] // 10, after_scheduler=cosineScheduler)
+    
     trainer = GaussianDiffusionTrainer(
         net_model, modelConfig["beta_1"], modelConfig["beta_T"], modelConfig["T"]).to(device)
 
