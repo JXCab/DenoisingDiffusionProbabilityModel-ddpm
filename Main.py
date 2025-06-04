@@ -1,5 +1,6 @@
 from Diffusion.Train import train, eval
 
+# https://zhuanlan.zhihu.com/p/666552214
 
 def main(model_config = None):
     modelConfig = {
