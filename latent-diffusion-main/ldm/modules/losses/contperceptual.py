@@ -79,6 +79,16 @@ class LPIPSWithDiscriminator(nn.Module):
             rec_loss = rec_loss + self.perceptual_weight * p_loss
 
         # 计算非负对数似然
+        '''
+        self.logvar 是一个可学习的数. 通过将重构误差 rec_loss 正则化为 nll_loss, 允许模型估计重构误差的不确定性.
+        通过这种方式, 模型可以学习在哪些区域的重构更加困难. 例如, 如果模型认为某个区域的重构更加困难, 可以通过增加该区域的 self.logvar 值来降低重构误差的影响,
+        这有助于模型更加健壮, 更好地应对有噪声的数据.
+
+        那么, 有读者自然会疑问, 如果只是这样, 为什么不只使用下面的方法呢: nll_loss = rec_loss / torch.exp(self.logvar)
+        换言之, 为什么要在后面加上 self.logvar ? 这其实也很容易理解, 我们不希望模型无脑地增加不确定性.
+        如果我们不加上 self.logvar, 那可能陷入一种这样的情况: 模型无限地增加 self.logvar, 认为重构总是很困难, 最终让重构误差 nll_loss 趋于 0, 并只考虑正则化误差.
+        这显然是不合适的, 因此在后面加上对数方差, 让模型能在两种情况下作出选择.
+        '''
         nll_loss = rec_loss / torch.exp(self.logvar) + self.logvar
         weighted_nll_loss = nll_loss
         if weights is not None:

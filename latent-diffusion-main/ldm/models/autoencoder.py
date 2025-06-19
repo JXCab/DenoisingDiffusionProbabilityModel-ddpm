@@ -281,7 +281,7 @@ class VQModelInterface(VQModel):
         dec = self.decoder(quant)
         return dec
 
-
+# https://blog.csdn.net/yusijinfs/article/details/134684608
 class AutoencoderKL(pl.LightningModule):
     def __init__(self,
                  ddconfig,                # 字典, 用于构造Encoder和Decoder的配置参数
