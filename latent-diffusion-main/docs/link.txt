@@ -1,0 +1,2 @@
+熵、交叉熵、KL散度: https://zhuanlan.zhihu.com/p/573334434
+KL散度公式推理: https://zhuanlan.zhihu.com/p/345095899

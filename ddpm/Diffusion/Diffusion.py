@@ -46,9 +46,9 @@ class GaussianDiffusionTrainer(nn.Module):
             extract(self.sqrt_alphas_bar, t, x_0.shape) * x_0 +
             extract(self.sqrt_one_minus_alphas_bar, t, x_0.shape) * noise)
         # 均方误差损失: MSE Loss = (1/n) * Σ(y_pred - y_actual)^2
-        # reduction='none'：求所有对应位置的差的平方，返回的仍然是一个和原来形状一样的矩阵。
-        # reduction='mean'：求所有对应位置差的平方的均值，返回的是一个标量。
-        # reduction='sum'：求所有对应位置差的平方的和，返回的是一个标量。
+        # reduction='none': 求所有对应位置的差的平方, 返回的仍然是一个和原来形状一样的矩阵。
+        # reduction='mean': 求所有对应位置差的平方的均值, 返回的是一个标量。
+        # reduction='sum': 求所有对应位置差的平方的和, 返回的是一个标量。
         loss = F.mse_loss(self.model(x_t, t), noise, reduction='none')
         return loss
 
